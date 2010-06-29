@@ -1,0 +1,6 @@
+Revision history for Perl extension XML::Feed::Aggregator.
+
+0.01  Fri Jun 25 17:58:13 2010
+	- original version; created by h2xs 1.23 with options
+		-X XML::Feed::Aggregator
+

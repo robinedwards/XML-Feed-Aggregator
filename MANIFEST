@@ -1,0 +1,8 @@
+Changes
+lib/XML/Feed/Aggregator.pm
+Makefile.PL
+MANIFEST
+README
+t/00-use.t
+t/aggregate.t
+META.yml
