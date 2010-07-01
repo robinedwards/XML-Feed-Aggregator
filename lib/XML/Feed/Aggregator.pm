@@ -6,27 +6,50 @@ use Carp;
 use URI;
 use XML::Feed;
 
-our $VERSION = 0.01;
+our $VERSION = 0.02;
 
 sub new {
-    my ($class, $param) = @_;
+    my ($class, $self) = @_;
 
-    croak 'uri should be an array ref'
-        if $param->{uri} and ref $param->{uri} ne 'ARRAY';
+    croak 'expecting HashRef' unless ref $self eq 'HASH';
 
-    for (@{$param->{uri}}) {
-        croak 'expecting list of URI objects' 
-            if ref $_ !~ /^URI/
+    bless ($self, $class);
+
+    if ($self->{uri}) {
+        croak 'uri attribute should be an array ref'
+            if ref $self->{uri} ne 'ARRAY';
+
+        $self->_coerce_uri;
     }
 
-    for (@{$param->{feeds}}) {
-        croak 'expecting list of XML::Feed objects' 
-            if ref $_ ne 'XML::Feed' 
+    if ($self->{feeds}) {
+        croak 'feeds attribute should be an array ref'
+        if ref $self->{feeds} ne 'ARRAY';
+
+
+        for (@{$self->{feeds}}) {
+            croak 'expecting list of XML::Feed objects' 
+            if ref $_ !~ /^XML::Feed/
+        }
     }
 
-    $param->{type} = ['RSS'];
+    $self->{type} = ['RSS'];
 
-    bless ($param, $class);
+    return $self;
+}
+
+sub _coerce_uri {
+    my ($self) = @_;
+
+    for (@{$self->{uri}}) {
+        next if ref =~ /^URI/;
+
+        croak 'expecting string / URI object' 
+            if ref $_ ne '';
+
+
+        $_ = URI->new($_);
+    }
 }
 
 sub _build_feed_list {
@@ -50,7 +73,7 @@ sub sort {
     }
 
     @{$self->{entries}} = 
-        sort { $a->issued->compare($b->issued) } 
+        sort { $b->issued->compare($a->issued) } 
             @{$self->{entries}};
 
     $self->_new_feed;
@@ -94,27 +117,33 @@ XML::Feed::Aggregator - Perl module for aggregating feeds
 
   use XML::Feed::Aggregator;
 
-  # construction
-
+  # list of URI's
   use URI;
   my $slashdot = URI->new('http://rss.slashdot.org/Slashdot/slashdot');
   my $useperl = URI->new('http://use.perl.org/index.rss');
-
   my $agg = XML::Feed::Aggregator->new({uri => [$slashdot, $useperl]);
 
-  # OR 
+  # or a list of XML::Feed's
   
+  use URI;
   use XML::Feed;
-  my $slashdot = XML::Feed->parse("http://rss.slashdot.org/Slashdot/slashdot");
-  my $useperl = XML::Feed->new('http://use.perl.org/index.rss');
 
+  my $slashdot = XML::Feed->parse(
+    URI->new("http://rss.slashdot.org/Slashdot/slashdot")
+  );
+
+  my $useperl = XML::Feed->parse(
+    URI->new('http://use.perl.org/index.rss')
+  );
   my $agg = XML::Feed::Aggregator->new({feeds =>[$slashdot, $useperl]);
 
+
   # usage
-  
   $agg->sort;
 
-  for ($agg->entries) {...}  # loop through XML::Feed::Entry's 
+  for ($agg->entries) {
+
+  }  # loop through XML::Feed::Entry's 
 
   my $feed = $agg->feed; # get aggregated XML::Feed object
 
@@ -124,9 +153,14 @@ This module aggregates feeds into a single XML::Feed object
 
 =head1 CONSTRUCTION
 
-Following params are passed to the final XML::Feed object
+ feeds - array ref of XML::Feed objects
+ uri - array ref of URI's or url strings
+
+These ptional attributes are passed to the final XML::Feed object
 
   title, link, base, description, tagline, author, & language
+
+See XML::Feed for more information.
 
 =head1 SEE ALSO
 
