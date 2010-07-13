@@ -5,8 +5,9 @@ use warnings;
 use Carp;
 use URI;
 use XML::Feed;
+use DateTime;
 
-our $VERSION = 0.02;
+our $VERSION = 0.03;
 
 sub new {
     my ($class, $self) = @_;
@@ -16,19 +17,19 @@ sub new {
     bless ($self, $class);
 
     if ($self->{uri}) {
-        croak 'uri attribute should be an array ref'
+        croak 'uri attribute should be an ArrayRef'
             if ref $self->{uri} ne 'ARRAY';
 
         $self->_coerce_uri;
     }
 
-    if ($self->{feeds}) {
-        croak 'feeds attribute should be an array ref'
-        if ref $self->{feeds} ne 'ARRAY';
+    if ($self->{sources}) {
+        croak 'sources parameter should be an ArrayRef'
+        if ref $self->{sources} ne 'ARRAY';
 
 
-        for (@{$self->{feeds}}) {
-            croak 'expecting list of XML::Feed objects' 
+        for (@{$self->{sources}}) {
+            croak 'sources: expecting list of XML::Feed objects' 
             if ref $_ !~ /^XML::Feed/
         }
     }
@@ -44,9 +45,8 @@ sub _coerce_uri {
     for (@{$self->{uri}}) {
         next if ref =~ /^URI/;
 
-        croak 'expecting string / URI object' 
+        croak 'uri parameter expects a string / URI' 
             if ref $_ ne '';
-
 
         $_ = URI->new($_);
     }
@@ -58,7 +58,7 @@ sub _build_feed_list {
     for my $uri (@{$self->{uri}}) {
         my $feed = XML::Feed->parse($uri)
             or croak $uri->as_string." ".XML::Feed->errstr; 
-        push @{$self->{feeds}}, $feed;
+        push @{$self->{sources}}, $feed;
     }
 }
 
@@ -68,7 +68,7 @@ sub sort {
 
     $self->_build_feed_list;
     
-    for my $feed (@{$self->{feeds}}) {
+    for my $feed (@{$self->{sources}}) {
        push @{$self->{entries}}, $feed->entries
     }
 
@@ -98,12 +98,21 @@ sub _new_feed {
     }
 }
 
-sub entries {
-    return $_[0]->{entries};
-}
+sub entries { $_[0]->{entries} }
 
-sub feed {
-    return $_[0]->{feed};
+sub feed { $_[0]->{feed} }
+
+sub sources { $_[0]->{sources} }
+
+sub since {
+    my ($self, $date) = @_;
+
+    croak "expecting a DateTime object" 
+        unless ref $date eq 'DateTime';
+    
+    return grep {
+        $date->compare($_->issued) < 0;
+    } @{$self->entries};
 }
 
 1;
@@ -119,33 +128,33 @@ XML::Feed::Aggregator - Perl module for aggregating feeds
 
   # list of URI's
   use URI;
+  use XML::Feed;
+  
+  # construction
   my $slashdot = URI->new('http://rss.slashdot.org/Slashdot/slashdot');
   my $useperl = URI->new('http://use.perl.org/index.rss');
   my $agg = XML::Feed::Aggregator->new({uri => [$slashdot, $useperl]);
 
   # or a list of XML::Feed's
-  
-  use URI;
-  use XML::Feed;
-
-  my $slashdot = XML::Feed->parse(
+  $slashdot = XML::Feed->parse(
     URI->new("http://rss.slashdot.org/Slashdot/slashdot")
   );
-
-  my $useperl = XML::Feed->parse(
+  $useperl = XML::Feed->parse(
     URI->new('http://use.perl.org/index.rss')
   );
-  my $agg = XML::Feed::Aggregator->new({feeds =>[$slashdot, $useperl]);
+  $agg = XML::Feed::Aggregator->new({sources => [$slashdot, $useperl]);
 
-
-  # usage
+  # sort entries by date
   $agg->sort;
 
+  # loop through XML::Feed::Entry objects 
   for ($agg->entries) {
+      say $_->title;
+      say $_->content;
+  }
 
-  }  # loop through XML::Feed::Entry's 
-
-  my $feed = $agg->feed; # get aggregated XML::Feed object
+  # get aggregated XML::Feed object
+  my $feed = $agg->feed;
 
 =head1 DESCRIPTION
 
@@ -153,14 +162,38 @@ This module aggregates feeds into a single XML::Feed object
 
 =head1 CONSTRUCTION
 
- feeds - array ref of XML::Feed objects
+ sources - array ref of XML::Feed objects
  uri - array ref of URI's or url strings
 
-These ptional attributes are passed to the final XML::Feed object
+The following parameters are passed to the new aggregated feed object
 
   title, link, base, description, tagline, author, & language
 
-See XML::Feed for more information.
+=head1 METHODS
+
+=head2 sort
+
+sort feed by date, should be called after construction
+
+=head2 feed
+
+returns the new XML::Feed object
+
+=head2 entries
+
+return list of feed entries
+
+=head2 sources
+
+return list of the source XML::Feed's
+
+=head2 since
+
+takes a DateTime object and returns any entries since that date
+
+=head1 CONTRIBUTE
+
+git://github.com/robinedwards/App-Syndicator.git
 
 =head1 SEE ALSO
 

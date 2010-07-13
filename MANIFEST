@@ -5,4 +5,5 @@ MANIFEST
 README
 t/00-use.t
 t/aggregate.t
+t/since.t
 META.yml

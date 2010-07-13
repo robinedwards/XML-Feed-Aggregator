@@ -20,11 +20,11 @@ use XML::Feed::Aggregator;
 # test construction from list of XML::Feed's
 {
     my $slashdot = XML::Feed->parse(URI->new('http://rss.slashdot.org/Slashdot/slashdot'));  
-    isa_ok($slashdot, 'XML::Feed');
+    isa_ok($slashdot, 'XML::Feed::Format::RSS');
     my $useperl = XML::Feed->parse(URI->new('http://use.perl.org/index.rss'));
-    isa_ok($useperl, 'XML::Feed');
+    isa_ok($useperl, 'XML::Feed::Format::RSS');
 
-    my $agg = XML::Feed::Aggregator->new({feeds=>[$slashdot, $useperl]});
+    my $agg = XML::Feed::Aggregator->new({sources=>[$slashdot, $useperl]});
     isa_ok($agg, 'XML::Feed::Aggregator');
 }
 
@@ -36,7 +36,7 @@ isa_ok($agg, 'XML::Feed::Aggregator');
 $agg->sort;
 
 my $feed = $agg->feed;
-isa_ok($feed, 'XML::Feed');
+isa_ok($feed, 'XML::Feed::Format::RSS');
 
 ok(scalar($feed->entries) > 0, 'feed count');
 
