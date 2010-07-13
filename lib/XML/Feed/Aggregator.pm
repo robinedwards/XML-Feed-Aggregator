@@ -112,9 +112,9 @@ sub since {
 
     croak "expecting a DateTime object" 
         unless ref $date eq 'DateTime';
-    
+
     return grep {
-        $date->compare($_->issued) < 0;
+        $date->compare($_->issued || $_->modified) < 0;
     } @{$self->entries};
 }
 
