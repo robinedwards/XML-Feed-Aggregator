@@ -72,14 +72,17 @@ sub sort {
        push @{$self->{entries}}, $feed->entries
     }
 
-    @{$self->{entries}} = 
-        sort { $b->issued->compare($a->issued) } 
-            @{$self->{entries}};
+    @{$self->{entries}} = sort {
+        my $adt = $a->issued || $a->modified;
+        my $bdt = $a->issued || $a->modified;
+        $bdt->compare($adt)    
+    } @{$self->{entries}};
 
     $self->_new_feed;
 
     $self->{feed}->add_entry($_) for (@{$self->{entries}});
 }
+
 
 sub _new_feed {
     my ($self) = @_;
