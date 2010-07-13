@@ -74,7 +74,7 @@ sub sort {
 
     @{$self->{entries}} = sort {
         my $adt = $a->issued || $a->modified;
-        my $bdt = $a->issued || $a->modified;
+        my $bdt = $b->issued || $b->modified;
         $bdt->compare($adt)    
     } @{$self->{entries}};
 
