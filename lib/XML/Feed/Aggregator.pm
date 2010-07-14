@@ -64,7 +64,7 @@ sub _build_feed_list {
 
 
 sub sort {
-    my ($self) = @_;
+    my ($self, $direction) = @_;
 
     $self->_build_feed_list;
     
@@ -72,17 +72,29 @@ sub sort {
        push @{$self->{entries}}, $feed->entries
     }
 
-    @{$self->{entries}} = sort {
-        my $adt = $a->issued || $a->modified;
-        my $bdt = $b->issued || $b->modified;
-        $bdt->compare($adt)    
-    } @{$self->{entries}};
+    if (defined $direction and $direction =~ /^desc/i){
+        @{$self->{entries}} = sort _desc_date @{$self->{entries}};
+    }
+    else {
+        @{$self->{entries}} = sort _asc_date @{$self->{entries}};
+    }
 
     $self->_new_feed;
 
     $self->{feed}->add_entry($_) for (@{$self->{entries}});
 }
 
+sub _asc_date {
+    my $adt = $a->issued || $a->modified;
+    my $bdt = $b->issued || $b->modified;
+    $bdt->compare($adt);
+}
+
+sub _desc_date {
+    my $adt = $a->issued || $a->modified;
+    my $bdt = $b->issued || $b->modified;
+    $adt->compare($bdt);
+}
 
 sub _new_feed {
     my ($self) = @_;
