@@ -6,6 +6,7 @@ use Carp;
 use URI;
 use XML::Feed;
 use DateTime;
+use Try::Tiny;
 
 our $VERSION = 0.03;
 
@@ -16,49 +17,72 @@ sub new {
 
     bless ($self, $class);
 
-    if ($self->{uri}) {
-        croak 'uri attribute should be an ArrayRef'
-            if ref $self->{uri} ne 'ARRAY';
+    $self->_coerce_sources(delete $self->{sources})
+        or
+    croak 'Missing sources';
 
-        $self->_coerce_uri;
-    }
-
-    if ($self->{sources}) {
-        croak 'sources parameter should be an ArrayRef'
-        if ref $self->{sources} ne 'ARRAY';
-
-
-        for (@{$self->{sources}}) {
-            croak 'sources: expecting list of XML::Feed objects' 
-            if ref $_ !~ /^XML::Feed/
-        }
-    }
-
-    $self->{type} = ['RSS'];
+    $self->{errors} = [];
+    $self->{new_feed}{type} ||= ['RSS'];
 
     return $self;
 }
 
-sub _coerce_uri {
-    my ($self) = @_;
+sub _coerce_sources {
+    my ($self, $sources) = @_;
+    
+    croak 'sources should be an ArrayRef'
+        if ref $sources ne 'ARRAY';
 
-    for (@{$self->{uri}}) {
-        next if ref =~ /^URI/;
+    $self->{_sources} = [];
 
-        croak 'uri parameter expects a string / URI' 
-            if ref $_ ne '';
+    for (@$sources) {
+        next unless $_;
 
-        $_ = URI->new($_);
+        if (ref ($_) =~ /^XML::Feed/ || ref ($_) =~ /^URI/) {
+            push @{$self->{_sources}}, $_;
+            next;
+        }
+
+        if (ref ($_) eq '') {
+            push @{$self->{_sources}}, URI->new($_);
+            next;
+        }
+
+        croak "expecting ArrayRef of XML::Feed / URI / Strings in sources";
     }
+
+    return scalar @{$self->{_sources}};
 }
 
 sub _build_feed_list {
     my ($self) = @_;
 
-    for my $uri (@{$self->{uri}}) {
-        my $feed = XML::Feed->parse($uri)
-            or croak $uri->as_string." ".XML::Feed->errstr; 
-        push @{$self->{sources}}, $feed;
+    for my $feed (@{$self->{_sources}}) {
+
+        if (ref ($feed) =~ /XML::Feed/) {
+            push @{$self->{sources}}, $_;
+            next;
+        }
+
+        if (ref ($feed) =~ /URI/) {
+            my $xml_feed;
+
+            try { $xml_feed = XML::Feed->parse($feed) }
+
+            catch {
+                push @{$self->{errors}},  $feed->as_string." failed: $_"; 
+            };
+
+            if (XML::Feed->errstr) {
+                push @{$self->{errors}}, 
+                    $feed->as_string." failed: ".XML::Feed->errstr;
+            }
+
+            push @{$self->{sources}}, $xml_feed if defined $xml_feed;
+            next;
+        }
+
+        croak "Couldn't create XML::Feed from a $feed";
     }
 }
 
@@ -68,7 +92,7 @@ sub sort {
 
     $self->_build_feed_list;
     
-    for my $feed (@{$self->{sources}}) {
+    for my $feed (grep {defined} @{$self->{sources}}) {
        push @{$self->{entries}}, $feed->entries
     }
 
@@ -99,7 +123,7 @@ sub _desc_date {
 sub _new_feed {
     my ($self) = @_;
 
-    $self->{feed} = XML::Feed->new(@{$self->{type}});
+    $self->{feed} = XML::Feed->new(@{$self->{new_feed}{type}});
 
     croak "Couldn't create new XML::Feed object" 
         unless defined $self->{feed};
@@ -108,7 +132,7 @@ sub _new_feed {
         tagline author language|) {
 
         if( $self->{$attr} ) {
-            $self->{feed}->$attr($self->{$attr});
+            $self->{feed}->$attr($self->{new_feed}{$attr});
         }
     }
 }
@@ -118,6 +142,8 @@ sub entries { $_[0]->{entries} }
 sub feed { $_[0]->{feed} }
 
 sub sources { $_[0]->{sources} }
+
+sub errors { $_[0]->{errors} }
 
 sub since {
     my ($self, $date) = @_;
@@ -130,6 +156,7 @@ sub since {
     } @{$self->entries};
 }
 
+
 1;
 __END__
 
@@ -139,28 +166,23 @@ XML::Feed::Aggregator - Perl module for aggregating feeds
 
 =head1 SYNOPSIS
 
-  use XML::Feed::Aggregator;
-
-  # list of URI's
   use URI;
   use XML::Feed;
+  use XML::Feed::Aggregator;
   
-  # construction
-  my $slashdot = URI->new('http://rss.slashdot.org/Slashdot/slashdot');
-  my $useperl = URI->new('http://use.perl.org/index.rss');
-  my $agg = XML::Feed::Aggregator->new({uri => [$slashdot, $useperl]);
+  # construction with URIs / XML::Feed / strings
+  my @sources = [ URI->new('http://rss.slashdot.org/Slashdot/slashdot'),
+    'http://use.perl.org/index.rss',
+    XML::Feed->parse(URI->new("http://planet.perl.org")) ];
 
-  # or a list of XML::Feed's
-  $slashdot = XML::Feed->parse(
-    URI->new("http://rss.slashdot.org/Slashdot/slashdot")
-  );
-  $useperl = XML::Feed->parse(
-    URI->new('http://use.perl.org/index.rss')
-  );
-  $agg = XML::Feed::Aggregator->new({sources => [$slashdot, $useperl]);
+  my $agg = XML::Feed::Aggregator->new({sources => \@sources});
 
   # sort entries by date
   $agg->sort;
+
+  # or descending order
+
+  $agg->sort('desc'); 
 
   # loop through XML::Feed::Entry objects 
   for ($agg->entries) {
@@ -168,8 +190,11 @@ XML::Feed::Aggregator - Perl module for aggregating feeds
       say $_->content;
   }
 
-  # get aggregated XML::Feed object
+  # get new aggregated XML::Feed object
   my $feed = $agg->feed;
+
+  # loop through errors;
+  warn $_ for (@{$agg->errors});
 
 =head1 DESCRIPTION
 
@@ -177,12 +202,17 @@ This module aggregates feeds into a single XML::Feed object
 
 =head1 CONSTRUCTION
 
- sources - array ref of XML::Feed objects
- uri - array ref of URI's or url strings
+List of feeds to be aggregated:
 
-The following parameters are passed to the new aggregated feed object
+ sources - ArrayRef of URI's, URL Strings and XML::Feed objects
 
-  title, link, base, description, tagline, author, & language
+Parameters for the new feed object ( see XML::Feed for more params )
+
+ new_feed => { 
+    title => 'New aggregated feed', 
+    link => 'http://www.your.com/feed.rss',
+    author => 'Jim Bob',
+ }
 
 =head1 METHODS
 
@@ -206,9 +236,13 @@ return list of the source XML::Feed's
 
 takes a DateTime object and returns any entries since that date
 
+=head2 errors
+
+returns list of errors that have occured
+
 =head1 CONTRIBUTE
 
-git://github.com/robinedwards/App-Syndicator.git
+git://github.com/robinedwards/XML::Feed::Aggregator.git
 
 =head1 SEE ALSO
 

@@ -6,7 +6,7 @@ use_ok 'DateTime::Duration';
 use_ok 'XML::Feed::Aggregator';
 
 my @sources = qw| http://rss.slashdot.org/Slashdot/slashdot http://use.perl.org/index.rss |;
-my $agg = XML::Feed::Aggregator->new({uri=>\@sources});
+my $agg = XML::Feed::Aggregator->new({sources=>\@sources});
 isa_ok($agg, 'XML::Feed::Aggregator');
 
 $agg->sort;
