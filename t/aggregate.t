@@ -2,6 +2,7 @@ use strict;
 use warnings;
 use Test::More 'no_plan';
 use URI;
+use Data::Dumper;
 use XML::Feed::Aggregator;
 
 # test construction from a mixed list
@@ -23,6 +24,7 @@ $agg->sort;
 
 my $feed = $agg->feed;
 isa_ok($feed, 'XML::Feed::Format::RSS');
+
 
 ok(scalar($feed->entries) > 0, 'feed count');
 

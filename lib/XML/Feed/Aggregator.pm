@@ -7,6 +7,7 @@ use URI;
 use XML::Feed;
 use DateTime;
 use Try::Tiny;
+use Data::Dumper;
 
 our $VERSION = 0.03;
 
@@ -21,7 +22,7 @@ sub new {
         or
     croak 'Missing sources';
 
-    $self->{errors} = [];
+    $self->{errors} = $self->{entries} = $self->{sources} = [];
     $self->{new_feed}{type} ||= ['RSS'];
 
     return $self;
@@ -67,23 +68,27 @@ sub _build_feed_list {
         if (ref ($feed) =~ /URI/) {
             my $xml_feed;
 
-            try { $xml_feed = XML::Feed->parse($feed) }
-
+            try { 
+                $xml_feed = XML::Feed->parse($feed)
+            }
             catch {
-                push @{$self->{errors}},  $feed->as_string." failed: $_"; 
+                push @{$self->{errors}}, $feed->as_string." failed: $_\n"; 
             };
 
             if (XML::Feed->errstr) {
                 push @{$self->{errors}}, 
-                    $feed->as_string." failed: ".XML::Feed->errstr;
-            }
+                    $feed->as_string." - failed: ".XML::Feed->errstr."\n";
+            };
 
-            push @{$self->{sources}}, $xml_feed if defined $xml_feed;
-            next;
+            if (ref($xml_feed) =~ /^XML::Feed/){
+                push @{$self->{sources}}, $xml_feed;
+            }
         }
 
-        croak "Couldn't create XML::Feed from a $feed";
+        croak "Couldn't create XML::Feed from '$feed'";
     }
+
+    croak "Couldn't load any feeds" unless scalar @{$self->{sources}} > 0;
 }
 
 
@@ -91,9 +96,10 @@ sub sort {
     my ($self, $direction) = @_;
 
     $self->_build_feed_list;
-    
-    for my $feed (grep {defined} @{$self->{sources}}) {
-       push @{$self->{entries}}, $feed->entries
+
+    while( shift @{$self->{sources}}) {
+        next unless $_->can('entries');
+        push @{$self->{entries}}, $_->entries;
     }
 
     if (defined $direction and $direction =~ /^desc/i){
