@@ -14,92 +14,87 @@ our $VERSION = 0.03;
 sub new {
     my ($class, $self) = @_;
 
-    croak 'expecting HashRef' unless ref $self eq 'HASH';
+    croak 'expecting HashRef' unless ref ($self) eq 'HASH';
+
+    croak 'sources should be an ArrayRef'
+        if ref ($self->{sources}) ne 'ARRAY';
+
+    $self->{errors} = $self->{entries} = [];
 
     bless ($self, $class);
 
-    $self->_coerce_sources(delete $self->{sources})
-        or
-    croak 'Missing sources';
 
-    $self->{errors} = $self->{entries} = $self->{sources} = [];
+    $self->_load_sources;
+
     $self->{new_feed}{type} ||= ['RSS'];
 
     return $self;
 }
 
-sub _coerce_sources {
-    my ($self, $sources) = @_;
-    
-    croak 'sources should be an ArrayRef'
-        if ref $sources ne 'ARRAY';
-
-    $self->{_sources} = [];
-
-    for (@$sources) {
-        next unless $_;
-
-        if (ref ($_) =~ /^XML::Feed/ || ref ($_) =~ /^URI/) {
-            push @{$self->{_sources}}, $_;
-            next;
-        }
-
-        if (ref ($_) eq '') {
-            push @{$self->{_sources}}, URI->new($_);
-            next;
-        }
-
-        croak "expecting ArrayRef of XML::Feed / URI / Strings in sources";
-    }
-
-    return scalar @{$self->{_sources}};
-}
-
-sub _build_feed_list {
+sub _load_sources {
     my ($self) = @_;
+    
+    my @feeds;
 
-    for my $feed (@{$self->{_sources}}) {
+    for (grep {defined } @{$self->{sources}}) {
+        next unless defined $_;
 
-        if (ref ($feed) =~ /XML::Feed/) {
-            push @{$self->{sources}}, $_;
+        if (ref ($_) =~ /^XML::Feed::Format/) {
+            push @feeds, $_;
             next;
         }
+        else {
+            my ($uri, $xml_feed);
 
-        if (ref ($feed) =~ /URI/) {
-            my $xml_feed;
-
-            try { 
-                $xml_feed = XML::Feed->parse($feed)
+            if (ref ($_) !~ /^URI/) {
+                $uri = URI->new($_);
+            } else {
+                $uri = $_;
             }
-            catch {
-                push @{$self->{errors}}, $feed->as_string." failed: $_\n"; 
-            };
 
-            if (XML::Feed->errstr) {
-                push @{$self->{errors}}, 
-                    $feed->as_string." - failed: ".XML::Feed->errstr."\n";
-            };
+            next unless defined $uri;
 
-            if (ref($xml_feed) =~ /^XML::Feed/){
-                push @{$self->{sources}}, $xml_feed;
-            }
+            $xml_feed = $self->_load_feed($uri);
+
+            push @feeds, $xml_feed
+                if defined $xml_feed;
         }
-
-        croak "Couldn't create XML::Feed from '$feed'";
     }
 
-    croak "Couldn't load any feeds" unless scalar @{$self->{sources}} > 0;
+    $self->{sources} = \@feeds;
+    return scalar(@{$self->{sources}});
 }
 
+sub _load_feed {
+    my ($self, $uri) = @_;
+
+    my $xml_feed;
+
+    try { 
+        $xml_feed = XML::Feed->parse($uri);
+    }
+    catch {
+        push @{$self->{errors}}, $uri->as_string." failed: $_\n"; 
+    }
+    finally {
+        push @{$self->{_sources}}, $xml_feed 
+            if defined $xml_feed;
+    };
+
+    if (XML::Feed->errstr) {
+        push @{$self->{errors}}, 
+        $uri->as_string." - failed: ".XML::Feed->errstr."\n";
+    };
+
+    return $xml_feed;
+}
 
 sub sort {
     my ($self, $direction) = @_;
 
-    $self->_build_feed_list;
-
-    while( shift @{$self->{sources}}) {
-        next unless $_->can('entries');
-        push @{$self->{entries}}, $_->entries;
+    for my $source (@{$self->{sources}}) {
+        next unless defined $source and $source->can('entries');
+        push @{$self->{entries}}, map { warn "adding : ".ref($_) } $source->entries;
     }
 
     if (defined $direction and $direction =~ /^desc/i){
@@ -109,7 +104,7 @@ sub sort {
         @{$self->{entries}} = sort _asc_date @{$self->{entries}};
     }
 
-    $self->_new_feed;
+    $self->_build_feed;
 
     $self->{feed}->add_entry($_) for (@{$self->{entries}});
 }
@@ -126,7 +121,7 @@ sub _desc_date {
     $adt->compare($bdt);
 }
 
-sub _new_feed {
+sub _build_feed {
     my ($self) = @_;
 
     $self->{feed} = XML::Feed->new(@{$self->{new_feed}{type}});
@@ -158,7 +153,7 @@ sub since {
         unless ref $date eq 'DateTime';
 
     return grep {
-        $date->compare($_->issued || $_->modified) < 0;
+        defined $_ and $date->compare($_->issued || $_->modified) < 0;
     } @{$self->entries};
 }
 
