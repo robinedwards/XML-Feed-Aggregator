@@ -11,7 +11,7 @@ isa_ok($agg, 'XML::Feed::Aggregator');
 
 $agg->sort;
 
-my $latest_entry = shift @{$agg->entries};
+my ($latest_entry) = $agg->entries;
 ok(defined $latest_entry);
 my $last = $latest_entry->issued; 
 isa_ok($last, 'DateTime');

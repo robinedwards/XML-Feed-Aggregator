@@ -16,18 +16,15 @@ my $elreg = 'http://www.theregister.co.uk/headlines.atom';
 
 my $sources = [$slashdot,$useperl, $elreg] ;
 
-my $agg = eval XML::Feed::Aggregator->new({sources=>$sources});
-
-warn Dumper $agg->errors;
+my $agg = XML::Feed::Aggregator->new({sources => $sources});
 
 isa_ok($agg, 'XML::Feed::Aggregator');
-
 
 $agg->sort;
 
 my $feed = $agg->feed;
+
 isa_ok($feed, 'XML::Feed::Format::RSS');
 
 ok(scalar($feed->entries) > 0, 'entry count');
-
-ok(scalar(@{$agg->errors}) == 0);
+ok(scalar($agg->errors) == 0);

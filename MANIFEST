@@ -6,4 +6,5 @@ README
 t/00-use.t
 t/aggregate.t
 t/since.t
+t/deduplicate.t
 META.yml

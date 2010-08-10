@@ -1,13 +1,15 @@
 package XML::Feed::Aggregator;
-use 5.00800;
+use 5.008;
 use strict;
 use warnings;
 use Carp;
 use URI;
 use XML::Feed;
+use XML::Feed::Deduper;
 use DateTime;
 use Try::Tiny;
-use Data::Dumper;
+use File::Temp qw/tempfile/;
+use namespace::autoclean;
 
 our $VERSION = 0.03;
 
@@ -19,14 +21,13 @@ sub new {
     croak 'sources should be an ArrayRef'
         if ref ($self->{sources}) ne 'ARRAY';
 
-    $self->{errors} = $self->{entries} = [];
+    $self->{$_} = [] for qw/entries errors/;
+
+    $self->{new_feed}{type} ||= ['RSS'];
 
     bless ($self, $class);
 
-
     $self->_load_sources;
-
-    $self->{new_feed}{type} ||= ['RSS'];
 
     return $self;
 }
@@ -36,7 +37,7 @@ sub _load_sources {
     
     my @feeds;
 
-    for (grep {defined } @{$self->{sources}}) {
+    for (grep {defined } $self->sources) {
         next unless defined $_;
 
         if (ref ($_) =~ /^XML::Feed::Format/) {
@@ -62,7 +63,7 @@ sub _load_sources {
     }
 
     $self->{sources} = \@feeds;
-    return scalar(@{$self->{sources}});
+    return scalar($self->sources);
 }
 
 sub _load_feed {
@@ -74,7 +75,7 @@ sub _load_feed {
         $xml_feed = XML::Feed->parse($uri);
     }
     catch {
-        push @{$self->{errors}}, $uri->as_string." failed: $_\n"; 
+        push @{$self->{errors}}, $uri->as_string." - failed: $_\n"; 
     }
     finally {
         push @{$self->{_sources}}, $xml_feed 
@@ -83,8 +84,8 @@ sub _load_feed {
 
     if (XML::Feed->errstr) {
         push @{$self->{errors}}, 
-        $uri->as_string." - failed: ".XML::Feed->errstr."\n";
-    };
+            $uri->as_string." - failed: ".XML::Feed->errstr."\n";
+    }
 
     return $xml_feed;
 }
@@ -92,21 +93,40 @@ sub _load_feed {
 sub sort {
     my ($self, $direction) = @_;
 
-    for my $source (@{$self->{sources}}) {
+    for my $source ($self->sources) {
         next unless defined $source and $source->can('entries');
-        push @{$self->{entries}}, map { warn "adding : ".ref($_) } $source->entries;
+        push @{$self->{entries}}, $source->entries;
     }
 
     if (defined $direction and $direction =~ /^desc/i){
-        @{$self->{entries}} = sort _desc_date @{$self->{entries}};
+        @{$self->{entries}} = sort _desc_date $self->entries;
     }
     else {
-        @{$self->{entries}} = sort _asc_date @{$self->{entries}};
+        @{$self->{entries}} = sort _asc_date $self->entries;
     }
 
     $self->_build_feed;
 
-    $self->{feed}->add_entry($_) for (@{$self->{entries}});
+    $self->{feed}->add_entry($_) for ($self->entries);
+}
+
+sub deduplicate {
+    my ($self) = @_;
+
+    my $entry_count = scalar $self->entries;
+
+    return unless $entry_count > 2;
+
+    my ($fh, $file) = tempfile();
+
+    $self->{deduper} ||= XML::Feed::Deduper->new(
+        path => $file
+    );
+
+    @{$self->{entries}} 
+        = $self->{deduper}->dedup($self->entries);
+    
+    return ($entry_count - scalar $self->entries);
 }
 
 sub _asc_date {
@@ -138,23 +158,23 @@ sub _build_feed {
     }
 }
 
-sub entries { $_[0]->{entries} }
+sub entries { @{$_[0]->{entries}} }
 
 sub feed { $_[0]->{feed} }
 
-sub sources { $_[0]->{sources} }
+sub sources { @{$_[0]->{sources}} }
 
-sub errors { $_[0]->{errors} }
+sub errors { @{$_[0]->{errors}} }
 
 sub since {
     my ($self, $date) = @_;
 
     croak "expecting a DateTime object" 
-        unless ref $date eq 'DateTime';
+        unless ref($date) eq 'DateTime';
 
     return grep {
         defined $_ and $date->compare($_->issued || $_->modified) < 0;
-    } @{$self->entries};
+    } $self->entries;
 }
 
 
@@ -182,8 +202,10 @@ XML::Feed::Aggregator - Perl module for aggregating feeds
   $agg->sort;
 
   # or descending order
+  $agg->sort('desc');
 
-  $agg->sort('desc'); 
+  my $d = $agg->deduplicate;
+  say "removed $d duplicates";
 
   # loop through XML::Feed::Entry objects 
   for ($agg->entries) {
@@ -195,7 +217,7 @@ XML::Feed::Aggregator - Perl module for aggregating feeds
   my $feed = $agg->feed;
 
   # loop through errors;
-  warn $_ for (@{$agg->errors});
+  warn $_ for ($agg->errors);
 
 =head1 DESCRIPTION
 
@@ -219,7 +241,11 @@ Parameters for the new feed object ( see XML::Feed for more params )
 
 =head2 sort
 
-sort feed by date, should be called after construction
+sort feed by date
+
+=head2 deduplicate
+
+removed duplicated entries from the feed
 
 =head2 feed
 
@@ -243,11 +269,11 @@ returns list of errors that have occured
 
 =head1 CONTRIBUTE
 
-git://github.com/robinedwards/XML::Feed::Aggregator.git
+git://github.com/robinedwards/XM-Feed-Aggregator.git
 
 =head1 SEE ALSO
 
-XML::Feed Feed::Find
+XML::Feed XML::Feed::Deduper Feed::Find
 
 =head1 AUTHOR
 

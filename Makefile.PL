@@ -12,6 +12,9 @@ WriteMakefile(
         DateTime => 0,
         DateTime::Duration => 0,
         Try::Tiny => 0,
+        XML::Feed::Deduper => 0.03,
+        namespace::autoclean => 0,
+        File::Temp => 0,
     },
     ($] >= 5.005 ?     ## Add these new keywords supported since 5.005
       (ABSTRACT_FROM  => 'lib/XML/Feed/Aggregator.pm', # retrieve abstract from module
