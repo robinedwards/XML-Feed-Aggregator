@@ -1,96 +1,62 @@
-package XML::Feed::Aggregator;
-use Moose;
-use MooseX::Types::Moose qw/ArrayRef Str/;
-use MooseX::Types -declare => [qw/Feed Entry/];
-use MooseX::Types::URI 'Uri';
-use Moose::Util::TypeConstraints;
-use URI;
-use XML::Feed;
-use Try::Tiny;
+package XML::Feed::Aggregator::Deduper;
+use Moose::Role;
+use Digest::MD5 'md5_hex'; 
+use MooseX::Types::Moose 'Int';
 use namespace::autoclean;
 
-our $VERSION = 0.040;
+requires 'add_entry';
+requires 'all_entries';
 
-class_type Entry, {isa => 'XML::Feed::Entry'};
-class_type Feed, {isa => 'XML::Feed'};
-
-has sources => (
-    is => 'rw',
-    isa => ArrayRef[Feed|Uri],
-    traits => [qw/Array/],
+has duplicate_count => (
+    is => 'ro',
+    isa => Int,
+    traits => ['Counter'],
+    default => 0,
     handles => {
-        all_sources => 'elements',
-        add_source => 'push',
-    },
-    builder => '_build_sources',
-);
-
-has entries => (
-    is => 'rw',
-    isa => ArrayRef[Entry],
-    handles => {
-        all_entries => 'elements',
-        add_entry => 'push',
-        entry_count => 'count',
+        inc_duplicate_count => 'inc',
+        reset_duplicate_count => 'reset'
     }
 );
 
-has _errors => (
-    is => 'rw',
-    isa => ArrayRef[Str],
-    handles => {
-        errors => 'elements',
-        add_error => 'push',
-    }
-);
-
-with 'XML::Feed::Aggregator::Sort';
-with 'XML::Feed::Aggregator::Deduper';
-
-sub _coerce_source_uri {
-    my ($self, $sources) = @_;
-
-    @$sources = grep { defined } map {
-        is_Str($_) ? URI->new($_) : $_
-    } @$sources;
-}
-
-sub fetch {
+sub deduplicate {
     my ($self) = @_;
 
-    for my $uri (grep { $_->isa('URI') } $self->all_sources) {
-        try { 
-            $uri = XML::Feed->parse($uri);
-        }
-        catch {
-            $self->add_error($uri->as_string." - failed: $_"); 
-        };
-    }
+    $self->reset_duplicate_count;
 
-    $self->sources(
-        grep { defined } $self->all_sources
+    $self->add_entry(
+        grep { defined }
+            map {
+                $self->_register($_)    
+            } $self->all_entries
     );
+
+    $self->{_register} = {};
 
     return $self;
 }
 
-sub _combine_sources {
-    my ($self) = @_;
+sub _register {
+    my ($self, $entry) = @_;
+   
+    my $code = md5_hex($entry->body || $entry->summary);
 
-    return if $self->entry_count > 0;
-
-    for my $source ($self->all_sources) {
-        next unless $source->can('entries');
-        $source->add_entry($source->entries);
+    unless (exists $self->{_register}{$code}) {
+        $self->{_register}{$code} = 1;
+        return $entry;
     }
+
+    $self->inc_dupelicate_count;
+
+    return;
 }
+
 
 1;
 __END__
 
 =head1 NAME
 
-XML::Feed::Aggregator - Perl module for aggregating feeds
+XML::Feed::Aggregator::Deduper - Perl module for aggregating feeds
 
 =head1 SYNOPSIS
 

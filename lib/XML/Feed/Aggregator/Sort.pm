@@ -1,88 +1,36 @@
-package XML::Feed::Aggregator;
-use Moose;
-use MooseX::Types::Moose qw/ArrayRef Str/;
-use MooseX::Types -declare => [qw/Feed Entry/];
-use MooseX::Types::URI 'Uri';
-use Moose::Util::TypeConstraints;
-use URI;
-use XML::Feed;
-use Try::Tiny;
+package XML::Feed::Aggregator::Sort;
+use Moose::Role;
 use namespace::autoclean;
 
-our $VERSION = 0.040;
+requires 'all_sources';
+requires 'all_entries';
+requires 'add_entry';
 
-class_type Entry, {isa => 'XML::Feed::Entry'};
-class_type Feed, {isa => 'XML::Feed'};
-
-has sources => (
-    is => 'rw',
-    isa => ArrayRef[Feed|Uri],
-    traits => [qw/Array/],
-    handles => {
-        all_sources => 'elements',
-        add_source => 'push',
-    },
-    builder => '_build_sources',
-);
-
-has entries => (
-    is => 'rw',
-    isa => ArrayRef[Entry],
-    handles => {
-        all_entries => 'elements',
-        add_entry => 'push',
-        entry_count => 'count',
-    }
-);
-
-has _errors => (
-    is => 'rw',
-    isa => ArrayRef[Str],
-    handles => {
-        errors => 'elements',
-        add_error => 'push',
-    }
-);
-
-with 'XML::Feed::Aggregator::Sort';
-with 'XML::Feed::Aggregator::Deduper';
-
-sub _coerce_source_uri {
-    my ($self, $sources) = @_;
-
-    @$sources = grep { defined } map {
-        is_Str($_) ? URI->new($_) : $_
-    } @$sources;
+sub sort_by_date {
+    $_[0]->_sort(sub {
+            my $adt = $a->issued || $a->modified;
+            my $bdt = $b->issued || $b->modified;
+            $adt->compare($bdt);
+        });
+    return $_[0];
 }
 
-sub fetch {
-    my ($self) = @_;
+sub sort_by_date_ascending {
+    $_[0]->_sort(sub {
+            my $adt = $a->issued || $a->modified;
+            my $bdt = $b->issued || $b->modified;
+            $bdt->compare($adt);
+        });
+    return $_[0];
+}
 
-    for my $uri (grep { $_->isa('URI') } $self->all_sources) {
-        try { 
-            $uri = XML::Feed->parse($uri);
-        }
-        catch {
-            $self->add_error($uri->as_string." - failed: $_"); 
-        };
-    }
+sub sort {
+    my ($self, $order) = @_;
 
-    $self->sources(
-        grep { defined } $self->all_sources
-    );
-
+    $self->_combine_sources;
+    $self->add_entry(sort &$order, $self->all_entries);
+    
     return $self;
-}
-
-sub _combine_sources {
-    my ($self) = @_;
-
-    return if $self->entry_count > 0;
-
-    for my $source ($self->all_sources) {
-        next unless $source->can('entries');
-        $source->add_entry($source->entries);
-    }
 }
 
 1;
@@ -90,7 +38,7 @@ __END__
 
 =head1 NAME
 
-XML::Feed::Aggregator - Perl module for aggregating feeds
+XML::Feed::Aggregator::Deduper - Perl module for aggregating feeds
 
 =head1 SYNOPSIS
 
