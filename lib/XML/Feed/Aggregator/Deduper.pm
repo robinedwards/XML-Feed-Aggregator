@@ -23,12 +23,7 @@ sub deduplicate {
 
     $self->reset_duplicate_count;
 
-    $self->add_entry(
-        grep { defined }
-            map {
-                $self->_register($_)    
-            } $self->all_entries
-    );
+    $self->grep( sub { shift->_register(shift) } );
 
     $self->{_register} = {};
 
@@ -38,11 +33,11 @@ sub deduplicate {
 sub _register {
     my ($self, $entry) = @_;
    
-    my $code = md5_hex($entry->body || $entry->summary);
+    my $sig = md5_hex($entry->content || $entry->summary);
 
-    unless (exists $self->{_register}{$code}) {
-        $self->{_register}{$code} = 1;
-        return $entry;
+    unless (exists $self->{_register}{$sig}) {
+        $self->{_register}{$sig} = 1;
+        return 0;
     }
 
     $self->inc_dupelicate_count;

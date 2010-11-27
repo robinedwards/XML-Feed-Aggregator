@@ -1,13 +1,13 @@
 package XML::Feed::Aggregator::Sort;
 use Moose::Role;
+use Data::Dumper;
 use namespace::autoclean;
 
-requires 'all_sources';
 requires 'all_entries';
 requires 'add_entry';
 
 sub sort_by_date {
-    $_[0]->_sort(sub {
+    $_[0]->sort(sub {
             my $adt = $a->issued || $a->modified;
             my $bdt = $b->issued || $b->modified;
             $adt->compare($bdt);
@@ -16,7 +16,7 @@ sub sort_by_date {
 }
 
 sub sort_by_date_ascending {
-    $_[0]->_sort(sub {
+    $_[0]->sort(sub {
             my $adt = $a->issued || $a->modified;
             my $bdt = $b->issued || $b->modified;
             $bdt->compare($adt);
@@ -27,8 +27,8 @@ sub sort_by_date_ascending {
 sub sort {
     my ($self, $order) = @_;
 
-    $self->_combine_sources;
-    $self->add_entry(sort &$order, $self->all_entries);
+    $self->_combine_feeds;
+    $self->add_entry(sort $order $self->all_entries);
     
     return $self;
 }

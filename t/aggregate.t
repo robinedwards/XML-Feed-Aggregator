@@ -7,22 +7,28 @@ use XML::Feed;
 use XML::Feed::Aggregator;
 
 # test construction from a mixed list
-my $slashdot = URI->new('http://rss.slashdot.org/Slashdot/slashdot');
-isa_ok($slashdot, 'URI');
 
-my $useperl = XML::Feed->parse(URI->new('http://use.perl.org/index.rss'));
-isa_ok($useperl, 'XML::Feed::Format::RSS');
+my $agg = XML::Feed::Aggregator->new({
+        sources => [
+            'http://rss.slashdot.org/Slashdot/slashdot',
+            'http://use.perl.org/index.rss',
+            'http://www.theregister.co.uk/headlines.atom',
+        ] 
+    }
+);
 
-my $elreg = URI->new('http://www.theregister.co.uk/headlines.atom');
-
-my $sources = [$slashdot,$useperl, $elreg];
-
-my $agg = XML::Feed::Aggregator->new({sources => $sources});
 
 isa_ok($agg, 'XML::Feed::Aggregator');
 
-$agg->sort_by_date->deduplicate;
+$agg->fetch;
 
+ok $agg->feed_count == 3, 'added feeds';
+
+$agg->_combine_feeds;
+
+$agg->sort_by_date;
+
+$agg->deduplicate;
 
 ok($agg->entry_count > 0, 'entry count');
-ok(scalar($agg->errors) == 0);
+ok $agg->error_count == 0, 'no errors';

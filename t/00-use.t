@@ -1,7 +1,6 @@
 use strict;
 use warnings;
-
-use Test::More tests => 3;
-BEGIN { use_ok('XML::Feed::Aggregator') };
-use_ok('XML::Feed::Aggregator::Sort');
-use_ok('XML::Feed::Aggregator::Deduper');
+use Test::More 'no_plan';
+use Test::NoWarnings;
+use Test::UseAllModules;
+all_uses_ok();
