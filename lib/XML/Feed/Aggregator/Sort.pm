@@ -7,29 +7,30 @@ requires 'all_entries';
 requires 'add_entry';
 
 sub sort_by_date {
-    $_[0]->sort(sub {
+   my ($self) = @_;
+
+   my @entry = $self->sort(sub {
             my $adt = $a->issued || $a->modified;
             my $bdt = $b->issued || $b->modified;
-            $adt->compare($bdt);
+            return $adt->compare($bdt);
         });
-    return $_[0];
+
+    $self->entries(\@entry);
+
+    return $self;
 }
 
 sub sort_by_date_ascending {
-    $_[0]->sort(sub {
-            my $adt = $a->issued || $a->modified;
-            my $bdt = $b->issued || $b->modified;
-            $bdt->compare($adt);
-        });
-    return $_[0];
-}
-
-sub sort {
-    my ($self, $order) = @_;
-
-    $self->_combine_feeds;
-    $self->add_entry(sort $order $self->all_entries);
+    my ($self) = @_;
     
+    my @entry = $self->sort(sub {
+            my $adt = $_[0]->issued || $_[0]->modified;
+            my $bdt = $_[1]->issued || $_[1]->modified;
+            return $bdt->compare($adt);
+        });
+
+    $self->entries(\@entry);
+
     return $self;
 }
 

@@ -18,29 +18,29 @@ has duplicate_count => (
     }
 );
 
+my $register = {};
+
 sub deduplicate {
     my ($self) = @_;
 
     $self->reset_duplicate_count;
 
-    $self->grep( sub { shift->_register(shift) } );
-
-    $self->{_register} = {};
+    $self->grep( sub { _register($_) } );
 
     return $self;
 }
 
 sub _register {
-    my ($self, $entry) = @_;
+    my ($entry) = @_;
    
-    my $sig = md5_hex($entry->content || $entry->summary);
+    my $sig = md5_hex($entry->title);
 
-    unless (exists $self->{_register}{$sig}) {
-        $self->{_register}{$sig} = 1;
-        return 0;
+    unless (exists $register->{$sig}) {
+        $register->{$sig} = 1;
+        return 1;
     }
 
-    $self->inc_dupelicate_count;
+    # $self->inc_duplicate_count;
 
     return;
 }

@@ -71,6 +71,9 @@ has entries => (
         entry_count => 'count',
         shift => 'shift',
         pop => 'pop',
+        sort => 'sort',
+        grep => 'grep',
+        map => 'map',
     }
 );
 
@@ -103,6 +106,8 @@ sub fetch {
         };
     }
 
+    $self->_combine_feeds;
+
     return $self;
 }
 
@@ -118,21 +123,6 @@ sub _combine_feeds {
     }
 }
 
-sub grep {
-    my ($self, $code) = @_;
-
-    $self->add_entries(
-        grep { $code->($self, $_) } $self->all_entries
-    );
-
-    return $self;
-}
-
-sub map {
-    my ($self, $code) = @_;
-
-    return map { $code->($self, $_) } $self->all_entries
-}
 
 1;
 __END__
