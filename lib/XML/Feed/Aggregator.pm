@@ -126,9 +126,8 @@ sub _combine_feeds {
 sub grep_entries {
     my ($self, $filter) = @_;
 
-    $self->entries([
-        grep $filter, $self->all_entries
-    ]);
+    my @entries = grep { $filter->($_) } $self->all_entries;
+    $self->entries(\@entries);
 
     return $self;
 }
