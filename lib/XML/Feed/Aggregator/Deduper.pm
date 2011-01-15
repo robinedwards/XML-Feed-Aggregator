@@ -6,6 +6,7 @@ use namespace::autoclean;
 
 requires 'add_entry';
 requires 'all_entries';
+requires 'grep_entries';
 
 has duplicate_count => (
     is => 'ro',
@@ -25,7 +26,9 @@ sub deduplicate {
 
     $self->reset_duplicate_count;
 
-    $self->grep( sub { _register($_) } );
+    $self->grep_entries( sub { _register($_) } );
+
+    $register = {};
 
     return $self;
 }
@@ -40,7 +43,7 @@ sub _register {
         return 1;
     }
 
-    # $self->inc_duplicate_count;
+    #$self->inc_duplicate_count;
 
     return;
 }

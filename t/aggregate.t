@@ -24,8 +24,6 @@ $agg->fetch;
 
 ok $agg->feed_count == 3, 'added feeds';
 
-$agg->_combine_feeds;
-
 $agg->sort_by_date;
 
 $agg->deduplicate;

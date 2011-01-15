@@ -70,9 +70,7 @@ has entries => (
         add_entry => 'push',
         entry_count => 'count',
         shift => 'shift',
-        pop => 'pop',
-        sort => 'sort',
-        grep => 'grep',
+        sort_entries => 'sort_in_place',
         map => 'map',
     }
 );
@@ -121,8 +119,19 @@ sub _combine_feeds {
             $feed->entries
         );
     }
+
+    $self->grep_entries(sub { defined $_ });
 }
 
+sub grep_entries {
+    my ($self, $filter) = @_;
+
+    $self->entries([
+        grep $filter, $self->all_entries
+    ]);
+
+    return $self;
+}
 
 1;
 __END__

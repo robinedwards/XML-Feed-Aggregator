@@ -9,13 +9,11 @@ requires 'add_entry';
 sub sort_by_date {
    my ($self) = @_;
 
-   my @entry = $self->sort(sub {
-            my $adt = $a->issued || $a->modified;
-            my $bdt = $b->issued || $b->modified;
+   $self->sort_entries(sub {
+            my $adt = $_[0]->issued || $_[0]->modified;
+            my $bdt = $_[1]->issued || $_[1]->modified;
             return $adt->compare($bdt);
         });
-
-    $self->entries(\@entry);
 
     return $self;
 }
@@ -23,13 +21,11 @@ sub sort_by_date {
 sub sort_by_date_ascending {
     my ($self) = @_;
     
-    my @entry = $self->sort(sub {
+    $self->sort_entries(sub {
             my $adt = $_[0]->issued || $_[0]->modified;
             my $bdt = $_[1]->issued || $_[1]->modified;
             return $bdt->compare($adt);
         });
-
-    $self->entries(\@entry);
 
     return $self;
 }
