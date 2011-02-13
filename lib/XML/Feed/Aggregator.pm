@@ -12,7 +12,7 @@ use XML::Feed;
 use Try::Tiny;
 use namespace::autoclean;
 
-our $VERSION = 0.040;
+our $VERSION = 0.0400;
 
 class_type RSSEntry, {class => 'XML::Feed::Entry::Format::RSS'};
 class_type AtomEntry, {class => 'XML::Feed::Entry::Format::Atom'};
@@ -68,10 +68,9 @@ has entries => (
     handles => {
         all_entries => 'elements',
         add_entry => 'push',
-        entry_count => 'count',
-        shift => 'shift',
         sort_entries => 'sort_in_place',
-        map => 'map',
+        map_entries => 'map',
+        entry_count => 'count',
     }
 );
 
@@ -90,8 +89,6 @@ has _errors => (
 with 'XML::Feed::Aggregator::Sort';
 with 'XML::Feed::Aggregator::Deduper';
 
-use Data::Dumper;
-
 sub fetch {
     my ($self) = @_;
 
@@ -104,23 +101,21 @@ sub fetch {
         };
     }
 
-    $self->_combine_feeds;
-
     return $self;
 }
 
-sub _combine_feeds {
+sub aggregate {
     my ($self) = @_;
 
-    return if $self->entry_count > 0;
+    return $self if $self->entry_count > 0;
 
     for my $feed ($self->all_feeds) {
-        $self->add_entry(
-            $feed->entries
-        );
+        $self->add_entry($feed->entries);
     }
 
     $self->grep_entries(sub { defined $_ });
+
+    return $self;
 }
 
 sub grep_entries {
@@ -141,72 +136,68 @@ XML::Feed::Aggregator - Perl module for aggregating feeds
 
 =head1 SYNOPSIS
 
-  use URI;
-  use XML::Feed;
-  use XML::Feed::Aggregator;
+    use XML::Feed;
+    use XML::Feed::Aggregator;
+
+    my $syndicator = XML::Feed::Aggregator->new(
+        sources => [
+            "http://blogs.perl.org/atom.xml",
+            "http://news.ycombinator.com/"
+        ],
+        feeds => [ XML::Feed->parse('./slashdot.rss') ]
+    
+    )->fetch->aggregate->deduplicate;
+
+
 =head1 DESCRIPTION
 
-This module aggregates feeds into a single XML::Feed object
+This module aggregates feeds from various sources for easy filtering and sorting.
 
-=head1 CONSTRUCTION
-
-List of feeds to be aggregated:
-
- sources - ArrayRef of URI's, URL Strings and XML::Feed objects
-
-Parameters for the new feed object ( see XML::Feed for more params )
-
- new_feed => { 
-    title => 'New aggregated feed', 
-    link => 'http://www.your.com/feed.rss',
-    author => 'Jim Bob',
- }
-
-=head1 METHODS
-
-=head2 sort
-
-sort feed by date
-
-=head2 deduplicate
-
-removed duplicated entries from the feed
-
-=head2 feed
-
-returns the new XML::Feed object
-
-=head2 entries
-
-return list of feed entries
+=head1 ATTRIBUTES
 
 =head2 sources
 
-return list of the source XML::Feed's
+Sources to be fetched / loaded into the feeds attribute.
 
-=head2 since
+=head2 feeds
 
-takes a DateTime object and returns any entries since that date
+An ArrayRef of XML::Feed objects.
+
+=head2 entries
+
+List of XML::Feed::Entry objects obtained from the sources
+
+=head1 METHODS
+
+=head2 fetch
+
+Coerces each source into an XML::Feed object, via XML::Feed->parse().
+
+This will fetch the source if necessary. Only needs to be called if sources are supplied on construction.
+
+=head2 aggregate
+
+append each entry
+
+=head2 error_count
 
 =head2 errors
 
-returns list of errors that have occured
-
 =head1 CONTRIBUTE
 
-git://github.com/robinedwards/XM-Feed-Aggregator.git
+git://github.com/robinedwards/XML-Feed-Aggregator.git
 
 =head1 SEE ALSO
 
-XML::Feed XML::Feed::Deduper Feed::Find
+Perlanet XML::Feed Feed::Find
 
 =head1 AUTHOR
 
-Robin Edwards, E<lt>rge@cpan.orgE<gt>
+Robin Edwards, E<lt>robin.ge@gmail.comE<gt>
 
 =head1 COPYRIGHT AND LICENSE
 
-Copyright (C) 2010 by Robin Edwards
+Copyright (C) 2010 - 2011 by Robin Edwards
 
 This library is free software; you can redistribute it and/or modify
 it under the same terms as Perl itself, either Perl version 5.12.1 or,
