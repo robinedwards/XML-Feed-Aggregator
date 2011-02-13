@@ -1,154 +1,102 @@
 package XML::Feed::Aggregator::Deduper;
 use Moose::Role;
-use Digest::MD5 'md5_hex'; 
-use MooseX::Types::Moose 'Int';
+use MooseX::Types::Moose qw/Int HashRef/;
+use HTML::Scrubber;
 use namespace::autoclean;
 
 requires 'add_entry';
 requires 'all_entries';
 requires 'grep_entries';
 
-has duplicate_count => (
+has body_register => (
     is => 'ro',
-    isa => Int,
-    traits => ['Counter'],
-    default => 0,
+    isa => HashRef,
+    default => sub { {} },
+    traits => ['Hash'],
     handles => {
-        inc_duplicate_count => 'inc',
-        reset_duplicate_count => 'reset'
+        _register_body_sig => 'set',
+        _body_sig_exists => 'exists'
     }
 );
 
-my $register = {};
+has title_register => (
+    is => 'ro',
+    isa => HashRef,
+    default => sub { {} },
+    traits => ['Hash'],
+    handles => {
+        _register_title_sig => 'set',
+        _title_sig_exists => 'exists'
+    }
+);
+
+has id_register => (
+    is => 'ro',
+    isa => HashRef,
+    default => sub { {} },
+    traits => ['Hash'],
+    handles => {
+        _register_id => 'set',
+        _id_exists => 'exists'
+    }
+);
 
 sub deduplicate {
     my ($self) = @_;
-
-    $self->reset_duplicate_count;
-
-    $self->grep_entries( sub { _register($_) } );
-
-    $register = {};
-
+    $self->grep_entries( sub { $self->_register($_) } );
     return $self;
 }
 
 sub _register {
-    my ($entry) = @_;
-   
-    my $sig = md5_hex($entry->title);
+    my ($self, $entry) = @_;
 
-    unless (exists $register->{$sig}) {
-        $register->{$sig} = 1;
-        return 1;
-    }
+    my $body = length($entry->content->body || '') 
+        >= length($entry->summary->body || '')
+        ? $entry->content->body : $entry->summary->body;
 
-    #$self->inc_duplicate_count;
+    my $body_sig = HTML::Scrubber->new->scrub($body);
 
-    return;
+    $body_sig =~ s/^\s+|\s+$//g;
+    $body_sig =~ s/\s+/ /g;
+
+    my $title_sig = $entry->title;
+    $title_sig =~ s/^\s+|\s+$//g;
+
+    return if $self->_id_exists($entry->id);
+    $self->_register_id($entry->id, 1);
+    return if $self->_title_sig_exists($title_sig);
+    $self->_register_title_sig($title_sig, 1);
+    return if $self->_body_sig_exists($body_sig);
+    $self->_register_body_sig($body_sig, 1);
+
+    return 1;
 }
 
-
 1;
+
 __END__
 
 =head1 NAME
 
-XML::Feed::Aggregator::Deduper - Perl module for aggregating feeds
-
-=head1 SYNOPSIS
-
-  use URI;
-  use XML::Feed;
-  use XML::Feed::Aggregator;
-  
-  # construction with URIs / XML::Feed / strings
-  my @sources = [ URI->new('http://rss.slashdot.org/Slashdot/slashdot'),
-    'http://use.perl.org/index.rss',
-    XML::Feed->parse(URI->new("http://planet.perl.org")) ];
-
-  my $agg = XML::Feed::Aggregator->new({sources => \@sources});
-
-  # sort entries by date
-  $agg->sort;
-
-  # or descending order
-  $agg->sort('desc');
-
-  my $d = $agg->deduplicate;
-  say "removed $d duplicates";
-
-  # loop through XML::Feed::Entry objects 
-  for ($agg->entries) {
-      say $_->title;
-      say $_->content;
-  }
-
-  # get new aggregated XML::Feed object
-  my $feed = $agg->feed;
-
-  # loop through errors;
-  warn $_ for ($agg->errors);
-
-=head1 DESCRIPTION
-
-This module aggregates feeds into a single XML::Feed object
-
-=head1 CONSTRUCTION
-
-List of feeds to be aggregated:
-
- sources - ArrayRef of URI's, URL Strings and XML::Feed objects
-
-Parameters for the new feed object ( see XML::Feed for more params )
-
- new_feed => { 
-    title => 'New aggregated feed', 
-    link => 'http://www.your.com/feed.rss',
-    author => 'Jim Bob',
- }
+XML::Feed::Aggregator::Deduper - role for deduplication
 
 =head1 METHODS
 
-=head2 sort
-
-sort feed by date
-
 =head2 deduplicate
 
-removed duplicated entries from the feed
+deduplicates entries in aggregator object.
 
-=head2 feed
+=head1 CODE
 
-returns the new XML::Feed object
-
-=head2 entries
-
-return list of feed entries
-
-=head2 sources
-
-return list of the source XML::Feed's
-
-=head2 since
-
-takes a DateTime object and returns any entries since that date
-
-=head2 errors
-
-returns list of errors that have occured
-
-=head1 CONTRIBUTE
-
-git://github.com/robinedwards/XM-Feed-Aggregator.git
+git://github.com/robinedwards/XML-Feed-Aggregator.git
 
 =head1 SEE ALSO
 
-XML::Feed XML::Feed::Deduper Feed::Find
+XML::Feed::Aggregator
 
 =head1 AUTHOR
 
-Robin Edwards, E<lt>rge@cpan.orgE<gt>
+Robin Edwards, E<lt>robin.ge@gmail.comE<gt>
 
 =head1 COPYRIGHT AND LICENSE
 
