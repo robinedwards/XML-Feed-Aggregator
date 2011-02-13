@@ -1,32 +1,28 @@
 use strict;
 use warnings;
 use Test::More 'no_plan';
-use URI;
-use Data::Dumper;
 use XML::Feed;
 use XML::Feed::Aggregator;
 
 # test construction from a mixed list
 
 my $agg = XML::Feed::Aggregator->new({
-        sources => [
-            'http://rss.slashdot.org/Slashdot/slashdot',
-            'http://use.perl.org/index.rss',
-            'http://www.theregister.co.uk/headlines.atom',
+        feeds => [
+            XML::Feed->parse('t_data/slashdot.rss'),
+            XML::Feed->parse('t_data/use_perl.rss'),
+            XML::Feed->parse('t_data/theregister.atom'),
         ] 
     }
 );
 
-
 isa_ok($agg, 'XML::Feed::Aggregator');
 
-$agg->fetch;
+is $agg->entry_count, 0, 'entry count';
+
+$agg->aggregate; # combine
 
 ok $agg->feed_count == 3, 'added feeds';
 
-$agg->sort_by_date;
+is $agg->entry_count, 75, 'entry count';
 
-$agg->deduplicate;
-
-ok($agg->entry_count > 0, 'entry count');
-ok $agg->error_count == 0, 'no errors';
+is $agg->error_count, 0,  'no errors';
