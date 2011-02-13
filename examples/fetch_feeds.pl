@@ -1,37 +1,32 @@
 use 5.012;
+use utf8;
 use strict;
 use warnings;
 use HTTP::Date;
 use HTML::Zoom;
-use Data::Dumper;
 use XML::Feed::Aggregator;
 
 binmode(STDOUT, ":utf8");
 
-my $agg = XML::Feed::Aggregator->new(sources => [
+my $agg = XML::Feed::Aggregator->new({sources => [
     "http://blogs.perl.org/atom.xml",
     "http://planet.perl.org/rss20.xml",
     "http://ironman.enlightenedperl.org/atom.xml",
     "http://blog.basho.com/feed/index.xml",
 #    "http://news.ycombinator.com/rss"
     ]
-);
+});
 
-$agg->fetch;
-say STDERR "entry count " . $agg->entry_count;
-$agg->deduplicate;
-say STDERR "entry count " . $agg->entry_count;
-$agg->grep_entries(sub {
+$agg->fetch->aggregate->grep_entries(sub {
         return 0 if $_->title =~ /perl\s?6/i;
         return 0 if $_->title =~ /mojolicious/i;
-        return 0 if $_->author && $_->author =~ /f00li5h/i;
+        return 0 if $_->title =~ /strawberry/i;
         return 0 unless length( $_->content || $_->summary ) > 0;
         return 0 unless defined $_->title ? 1 : 0;
         return 0 unless defined ($_->issued || $_->modified) ? 1 : 0;
         return 1;
     });
 
-say STDERR "entry count " . $agg->entry_count;
 $agg->sort_by_date_ascending;
 
 my $title = "My Feeds - generated ".time2str();
@@ -68,14 +63,23 @@ HEADER
 
 my $zoom = HTML::Zoom->from_html($template);
 
-my @entries = $agg->map(sub {
+my @entries = $agg->map_entries(sub {
         my $pub = $_->issued || $_->modified;
+
+        my $title = $_->title;
+        utf8::decode($title);
 
         my $entry_title = HTML::Zoom->from_html('<h3>'.$pub->ymd('-') . ' ' . $pub->hms(':')
             .' ' . $_->title . ' <a href="'.$_->link.'">LINKY?!</a> '
             . ' By ' . ($_->author || '?' ). '</h3>');
-            
-        my $entry_body = HTML::Zoom->from_html(( $_->content || $_->summary )->body);
+       
+        my $body = length($_->content->body || '') 
+            >= length($_->summary->body || '') 
+                ? $_->content->body : $_->summary->body;
+
+        utf8::decode($body);
+
+        my $entry_body = HTML::Zoom->from_html($body);
 
         return sub {
            $_->select('#entry_title')->replace_content($entry_title)
