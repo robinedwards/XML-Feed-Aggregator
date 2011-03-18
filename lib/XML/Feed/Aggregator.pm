@@ -127,16 +127,27 @@ sub grep_entries {
     return $self;
 }
 
+sub to_feed {
+    my ($self, @params) = @_;
+
+    my $feed = XML::Feed->new(@params);
+
+    for my $entry ($self->all_entries) {
+        $feed->add_entry($entry);
+    }
+
+    return $feed;
+}
+
 1;
 __END__
 
 =head1 NAME
 
-XML::Feed::Aggregator - Perl module for aggregating feeds
+XML::Feed::Aggregator - Simple feed aggregator
 
 =head1 SYNOPSIS
 
-    use XML::Feed;
     use XML::Feed::Aggregator;
 
     my $syndicator = XML::Feed::Aggregator->new(
@@ -146,18 +157,27 @@ XML::Feed::Aggregator - Perl module for aggregating feeds
         ],
         feeds => [ XML::Feed->parse('./slashdot.rss') ]
     
-    )->fetch->aggregate->deduplicate;
+    )->fetch->aggregate->deduplicate->sort;
 
+    # Also.. 
+
+    $syndicator->grep_entries(sub {
+        $_->author ne 'James'
+    })->deduplicate;
+
+    say $syndicator->map_entries(sub { $_->title } );
 
 =head1 DESCRIPTION
 
-This module aggregates feeds from various sources for easy filtering and sorting.
+This module aggregates feeds from different sources for easy filtering and sorting.
 
 =head1 ATTRIBUTES
 
 =head2 sources
 
 Sources to be fetched / loaded into the feeds attribute.
+
+Coerces to an ArrayRef of URI objects.
 
 =head2 feeds
 
@@ -171,21 +191,36 @@ List of XML::Feed::Entry objects obtained from the sources
 
 =head2 fetch
 
-Coerces each source into an XML::Feed object, via XML::Feed->parse().
+Convert each source into an XML::Feed object, via XML::Feed->parse()
 
-This will fetch the source if necessary. Only needs to be called if sources are supplied on construction.
+For a remote address this involves fetching.
 
 =head2 aggregate
 
-append each entry
+Add all entries to the shared 'entries' attribute
+
+=head1 FEED METHODS
+=head2 add_feeds
+=head2 all_feeds
+=head2 feed_count
+
+=head1 ENTRY METHODS
+=head2 sort_entries
+=head2 map_entries
+=head2 grep_entries
+=head2 add_entry
+=head2 entry_count
+=head2 all_entrys
+
+=head1 ERROR HANDLING
 
 =head2 error_count
 
+Number of errors occured fetching / parsing feeds.
+
 =head2 errors
 
-=head1 CONTRIBUTE
-
-git://github.com/robinedwards/XML-Feed-Aggregator.git
+An ArrayRef of errors whilst fetching / parsing feeds.
 
 =head1 SEE ALSO
 
@@ -194,6 +229,8 @@ Perlanet XML::Feed Feed::Find
 =head1 AUTHOR
 
 Robin Edwards, E<lt>robin.ge@gmail.comE<gt>
+
+@robingedwards http://github.com/robinedwards/
 
 =head1 COPYRIGHT AND LICENSE
 
