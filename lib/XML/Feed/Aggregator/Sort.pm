@@ -26,6 +26,21 @@ sub sort_by_date_ascending {
     return $self;
 }
 
+sub sort {
+    my ($self, $order) = @_;
+
+    warn "Called deprecated method ->sort";
+
+    if ($order eq 'desc') {
+        $self->sort_by_date;
+    }
+    else {
+        $self->sort_by_date_ascending;
+    }
+
+    return $self;
+}
+
 1;
 __END__
 
@@ -50,28 +65,20 @@ XML::Feed::Aggregator::Sort - Role for sorting feed entries
 
 =head2 sort_entries
 
+Provide your own sorting routine via a CodeRef, two entries provided as arguments.
+
 =head2 sort_by_date
+
+Sort entries with date in descending order.
 
 =head2 sort_by_date_ascending
 
-=head1 CONTRIBUTE
-
-git://github.com/robinedwards/XM-Feed-Aggregator.git
+Sort entries with date in ascending order.
 
 =head1 SEE ALSO
 
-XML::Feed::Aggregator XML::Feed::Aggregator::Sort
+L<XML::Feed::Aggregator>
 
-=head1 AUTHOR
-
-Robin Edwards, E<lt>robin.ge@gmail.comE<gt>
-
-=head1 COPYRIGHT AND LICENSE
-
-Copyright (C) 2010 by Robin Edwards
-
-This library is free software; you can redistribute it and/or modify
-it under the same terms as Perl itself, either Perl version 5 or,
-at your option, any later version of Perl 5 you may have available.
+L<XML::Feed::Aggregator::Deduper>
 
 =cut
