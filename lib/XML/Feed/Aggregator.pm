@@ -12,8 +12,6 @@ use XML::Feed;
 use Try::Tiny;
 use namespace::autoclean;
 
-our $VERSION = 0.0400;
-
 class_type RSSEntry, {class => 'XML::Feed::Entry::Format::RSS'};
 class_type AtomEntry, {class => 'XML::Feed::Entry::Format::Atom'};
 class_type AtomFeed, {class => 'XML::Feed::Format::RSS'};
@@ -157,9 +155,7 @@ XML::Feed::Aggregator - Simple feed aggregator
         ],
         feeds => [ XML::Feed->parse('./slashdot.rss') ]
     
-    )->fetch->aggregate->deduplicate->sort;
-
-    # Also.. 
+    )->fetch->aggregate->deduplicate->sort_by_date;
 
     $syndicator->grep_entries(sub {
         $_->author ne 'James'
@@ -175,7 +171,7 @@ This module aggregates feeds from different sources for easy filtering and sorti
 
 =head2 sources
 
-Sources to be fetched / loaded into the feeds attribute.
+Sources to be fetched and loaded into the feeds attribute.
 
 Coerces to an ArrayRef of URI objects.
 
@@ -185,7 +181,7 @@ An ArrayRef of XML::Feed objects.
 
 =head2 entries
 
-List of XML::Feed::Entry objects obtained from the sources
+List of XML::Feed::Entry objects obtained from each feed
 
 =head1 METHODS
 
@@ -193,30 +189,74 @@ List of XML::Feed::Entry objects obtained from the sources
 
 Convert each source into an XML::Feed object, via XML::Feed->parse()
 
-For a remote address this involves fetching.
+For a remote address this involves a http request.
 
 =head2 aggregate
 
-Add all entries to the shared 'entries' attribute
+Combine all feed entries into a single 'entries' attribute
+
+=head2 to_feed
+
+Export aggregated feed to a single XML::Feed object. 
+
+All parameters passed to L<XML::Feed> constructor.
 
 =head1 FEED METHODS
-=head2 add_feeds
+
+Methods relating to the 'feeds' attribute
+
+=head2 add_feed
+
+Add a new feed to the 'feeds' attribute.
+
 =head2 all_feeds
+
+Return all feeds as an Array.
+
 =head2 feed_count
 
+Number of feeds.
+ 
 =head1 ENTRY METHODS
+
+Methods relating to the 'entries' attribute
+
 =head2 sort_entries
+
+See L<XML::Feed::Aggregator::Sort>
+
 =head2 map_entries
+
+Loop over all entries using $_ within a CodeRef.
+
 =head2 grep_entries
+
+Grep through entries using $_ within a CodeRef.
+
 =head2 add_entry
+
+Add a new entry to the aggregated feed.
+
 =head2 entry_count
-=head2 all_entrys
+
+Number of entries.
+
+=head2 all_entries
+
+Returns all entries as an array
+
+=head1 ROLES
+
+This class consumes the following roles for sorting and deduplication.
+
+L<XML::Feed::Aggregator::Deduper>
+L<XML::Feed::Aggregator::Sort>
 
 =head1 ERROR HANDLING
 
 =head2 error_count
 
-Number of errors occured fetching / parsing feeds.
+Number of errors occured.
 
 =head2 errors
 
@@ -224,20 +264,10 @@ An ArrayRef of errors whilst fetching / parsing feeds.
 
 =head1 SEE ALSO
 
-Perlanet XML::Feed Feed::Find
+L<XML::Feed::Aggregator::Deduper>
 
-=head1 AUTHOR
+L<XML::Feed::Aggregator::Sort>
 
-Robin Edwards, E<lt>robin.ge@gmail.comE<gt>
-
-@robingedwards http://github.com/robinedwards/
-
-=head1 COPYRIGHT AND LICENSE
-
-Copyright (C) 2010 - 2011 by Robin Edwards
-
-This library is free software; you can redistribute it and/or modify
-it under the same terms as Perl itself, either Perl version 5.12.1 or,
-at your option, any later version of Perl 5 you may have available.
+L<App::Syndicator> L<Perlanet> L<XML::Feed> L<Feed::Find>
 
 =cut

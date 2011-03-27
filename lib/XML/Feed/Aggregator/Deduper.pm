@@ -84,26 +84,12 @@ XML::Feed::Aggregator::Deduper - role for deduplication
 
 =head2 deduplicate
 
-deduplicates entries in aggregator object.
-
-=head1 CODE
-
-git://github.com/robinedwards/XML-Feed-Aggregator.git
+deduplicates entries with an aggregator object.
 
 =head1 SEE ALSO
 
-XML::Feed::Aggregator
+L<XML::Feed::Aggregator>
 
-=head1 AUTHOR
+L<XML::Feed::Aggregator::Sort>
 
-Robin Edwards, E<lt>robin.ge@gmail.comE<gt>
 
-=head1 COPYRIGHT AND LICENSE
-
-Copyright (C) 2010 by Robin Edwards
-
-This library is free software; you can redistribute it and/or modify
-it under the same terms as Perl itself, either Perl version 5.12.1 or,
-at your option, any later version of Perl 5 you may have available.
-
-=cut
